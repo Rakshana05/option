@@ -1,0 +1,26 @@
+table {
+border-collapse: collapse;
+width: 80%;
+margin: 20px auto;
+font-family: sans-serif;
+}
+
+th, td {
+border: 1px solid #ddd;
+padding: 10px;
+text-align: center;
+}
+
+th {
+background-color: #f2f2f2;
+}
+
+tbody tr:nth-child(even) {
+background-color: #f8f8f8;
+}
+
+h4{
+text-align: center;
+font-size: 32px;
+font-family: sans-serif;
+}
