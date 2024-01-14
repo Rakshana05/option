@@ -1,3 +1,40 @@
+.header {
+    height: 200px;
+    width: 1140px;
+    line-height: 80px;
+    border-bottom: thin lightgrey solid;
+}
+
+.header .header--title {
+    font-size: 75px;
+    padding-left: 5px;
+    color: white;
+}
+
+.logo{
+}
+
+.inputs {
+    height: 30px;
+}
+
+.inputs .inputs--drop {
+    padding-left: 5px;
+    width: 250px;
+    color: black;
+}
+
+.inputs .inputs--date {
+    padding-left: 5px;
+    height: 30px;
+    width: 250px;
+    color: black;
+}
+
+.outputs {
+    height: 1200px;
+}
+
 table {
 border-collapse: collapse;
 width: 80%;
