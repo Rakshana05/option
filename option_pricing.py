@@ -1,6 +1,10 @@
 from dash import Dash, dcc, html, Input, Output, State
 import numpy as np
-from datetime import datetime, date
+import datetime
+from jugaad_data.nse import NSELive
+from pprint import pprint
+n = NSELive()
+
 
 import requests
 import json
@@ -52,12 +56,15 @@ app.layout = html.Div(style={'backgroundColor': '#6399EB'},
     prevent_initial_call=True)
 
 def create_expiry_dates(n_clicks,symbol):
-    url = "https://www.nseindia.com/api/option-chain-indices?symbol={}".format(symbol)
-    headers={'User-Agent' : 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'}
-    response = requests.get(url, headers=headers, timeout=10)
-    print(response)
+    # url = "https://www.nseindia.com/api/option-chain-indices?symbol={}".format(symbol)
+    # headers={'User-Agent' : 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'}
+    # response = requests.get(url, headers=headers, timeout=10)
+    # print(response)
     global json_object
-    json_object = json.loads(response.text)
+    # json_object = json.loads(response.text)
+
+    json_object = n.index_option_chain(symbol)
+
     expiryDates = json_object["records"]["expiryDates"]
     return expiryDates
 
@@ -91,36 +98,63 @@ def calculate_option_price(n_clicks, underlying, expiry):
     else:
         return html.P("Enter the values")
 
-def days_between(d1):
-    d2 = datetime.strptime(str(datetime.today().date()), "%Y-%m-%d")
-    return abs((d2 - d1).days)
 
+def calculate_business_days_to_date(selected_date, holidays=[]):
+    """
+    Calculates the difference in business days between today and a selected date.
+    """
+
+    today = datetime.date.today()  # Ensure date-only objects are used
+    business_days = 0
+
+    business_days = np.busday_count(today, selected_date, holidays=holidays)
+
+    return abs(business_days)
+
+
+# Placeholder function for now
 def option_pricing_calculations(underlying, expiry):
     symbol = underlying
     r = 0.0711                                           
     n = 8     
-    T = datetime.strptime(expiry, "%d-%b-%Y")
-    T = days_between(T)
-    underlyingValue = json_object["records"]["data"][0]["PE"]["underlyingValue"]
+    T = datetime.datetime.strptime(expiry, "%d-%b-%Y").date()
+    T = calculate_business_days_to_date(T)
+    underlyingValue = json_object["records"]["underlyingValue"]
     
-    strike_price = []  # From API
-    actual_call = []  # Get from downloaded JSON file from API
-    actual_put = []  # Get from downloaded JSON file from API
-    iv_call =[]
-    iv_put =[]
+    strikePrice = []
+    PutLastPrice = []
+    CallLastPrice = []
+    PutIV = []
+    CallIV = []
 
-    for i in range(len(json_object["records"]["data"])):
-        if json_object["records"]["data"][i]["expiryDate"]==expiry and json_object["records"]["data"][i]["strikePrice"]>=22000:  # for bankNifty it has to change
-            strike_price.append(json_object["records"]["data"][i]["strikePrice"]) 
-            actual_put.append(json_object["records"]["data"][i]["PE"]["lastPrice"])  # There are some empty values, do some change
-            actual_call.append(json_object["records"]["data"][i]["CE"]["lastPrice"])
-            iv_call.append(json_object["records"]["data"][i]["CE"]["impliedVolatility"])
-            iv_put.append(json_object["records"]["data"][i]["PE"]["impliedVolatility"])
+    for option_data in json_object['records']['data']:
+        strike_price = option_data['strikePrice']
 
+        strikePrice.append(strike_price)
+
+        if 'PE' in option_data:
+            pe_last_price = option_data['PE']['lastPrice']
+            pe_implied_volatility = option_data['PE']['impliedVolatility']  # Access implied volatility
+            PutLastPrice.append(pe_last_price)
+            PutIV.append(pe_implied_volatility)
+        else:
+            PutLastPrice.append(0)
+            PutIV.append(0)
+
+        if 'CE' in option_data:
+            ce_last_price = option_data['CE']['lastPrice']
+            ce_implied_volatility = option_data['CE']['impliedVolatility']  # Access implied volatility
+            CallLastPrice.append(ce_last_price)
+            CallIV.append(ce_implied_volatility)
+        else:
+            CallLastPrice.append(0)
+            CallIV.append(0)
                 
-    calc_call = binomial_option_prices(underlyingValue,strike_price,r,T,iv_call,n,"call")  
-    calc_put = binomial_option_prices(underlyingValue,strike_price,r,T,iv_put,n,"put")   
-    arr = (np.column_stack((actual_call, calc_call, strike_price, actual_put, calc_put)))
+    calc_call = binomial_option_prices(underlyingValue,strikePrice,r,T,CallIV,n,"call")  
+    calc_put = binomial_option_prices(underlyingValue,strikePrice,r,T,PutIV,n,"put")   
+
+
+    arr = (np.column_stack((CallLastPrice, calc_call, strikePrice, PutLastPrice, calc_put)))
     return arr
 
 def binomial_option_prices(S, X_values, r, T, volatility_values, n, option_type):
@@ -131,9 +165,9 @@ def binomial_option_prices(S, X_values, r, T, volatility_values, n, option_type)
             delta_t = T / n
             u = math.exp(volatility * math.sqrt(delta_t))
             d = 1 / u
-            ############## it shows divide by 0 error, so added these
-            if not (u-d):
-                break
+            # ############## it shows divide by 0 error, so added these
+            # if not (u-d):
+            #     break
             p = (math.exp(r * delta_t) - d) / (u - d)
             discount_factor = math.exp(-r * delta_t)
 
@@ -160,7 +194,7 @@ def binomial_option_prices(S, X_values, r, T, volatility_values, n, option_type)
             option_prices.append(option_values[0])
 
         prices.append(option_prices[0])
-
+    print(option_prices)
     return prices
 
 if __name__ == "__main__":
