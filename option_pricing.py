@@ -93,7 +93,7 @@ def calculate_option_price(n_clicks, underlying, expiry):
                     html.Tr([html.Td(x) for x in row]) for row in results
                 ])
             ]),
-            html.P("Last Updated: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            html.P("Last Updated: {}".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         ])
     else:
         return html.P("Enter the values")
@@ -127,31 +127,52 @@ def option_pricing_calculations(underlying, expiry):
     PutIV = []
     CallIV = []
 
+    if underlying=="NIFTY":
+        L,H=20000,22000
+    else:
+        L,H=33000,55000
+
     for option_data in json_object['records']['data']:
+
         strike_price = option_data['strikePrice']
 
-        strikePrice.append(strike_price)
+        # Only append details for strike prices above the threshold
+        if strike_price >= L and strike_price <= H and option_data['expiryDate']==expiry:
+            strikePrice.append(strike_price)
 
-        if 'PE' in option_data:
-            pe_last_price = option_data['PE']['lastPrice']
-            pe_implied_volatility = option_data['PE']['impliedVolatility']  # Access implied volatility
-            PutLastPrice.append(pe_last_price)
-            PutIV.append(pe_implied_volatility)
-        else:
-            PutLastPrice.append(0)
-            PutIV.append(0)
+            if 'PE' in option_data:
+                pe_last_price = option_data['PE']['lastPrice']
+                pe_implied_volatility = option_data['PE']['impliedVolatility']  # Access implied volatility
+                PutLastPrice.append(pe_last_price)
+                PutIV.append(pe_implied_volatility)
+            else:
+                PutLastPrice.append(0)
+                PutIV.append(0)
 
-        if 'CE' in option_data:
-            ce_last_price = option_data['CE']['lastPrice']
-            ce_implied_volatility = option_data['CE']['impliedVolatility']  # Access implied volatility
-            CallLastPrice.append(ce_last_price)
-            CallIV.append(ce_implied_volatility)
-        else:
-            CallLastPrice.append(0)
-            CallIV.append(0)
+            if 'CE' in option_data:
+                ce_last_price = option_data['CE']['lastPrice']
+                ce_implied_volatility = option_data['CE']['impliedVolatility']  # Access implied volatility
+                CallLastPrice.append(ce_last_price)
+                CallIV.append(ce_implied_volatility)
+            else:
+                CallLastPrice.append(0)
+                CallIV.append(0)
+
+
+    # for i in range(len(json_object["records"]["data"])):
+    #     if (json_object["records"]["data"][i]["expiryDate"]==expiry):  # for bankNifty it has to change
+    #         strike_price.append(json_object["records"]["data"][i]["strikePrice"]) 
+    #         actual_put.append(json_object["records"]["data"][i]["PE"]["lastPrice"])  # There are some empty values, do some change
+    #         actual_call.append(json_object["records"]["data"][i]["CE"]["lastPrice"])
+    #         iv_call.append(json_object["records"]["data"][i]["CE"]["impliedVolatility"])
+    #         iv_put.append(json_object["records"]["data"][i]["PE"]["impliedVolatility"])
+
                 
     calc_call = binomial_option_prices(underlyingValue,strikePrice,r,T,CallIV,n,"call")  
-    calc_put = binomial_option_prices(underlyingValue,strikePrice,r,T,PutIV,n,"put")   
+    calc_put = binomial_option_prices(underlyingValue,strikePrice,r,T,PutIV,n,"put") 
+
+    # calc_call = np.zeros(len(strikePrice)) 
+    # calc_put = np.zeros(len(strikePrice))   
 
 
     arr = (np.column_stack((CallLastPrice, calc_call, strikePrice, PutLastPrice, calc_put)))
@@ -164,7 +185,9 @@ def binomial_option_prices(S, X_values, r, T, volatility_values, n, option_type)
         for volatility in volatility_values:
             delta_t = T / n
             u = math.exp(volatility * math.sqrt(delta_t))
+            
             d = 1 / u
+            print(volatility,math.sqrt(delta_t),u,d)
             # ############## it shows divide by 0 error, so added these
             # if not (u-d):
             #     break
