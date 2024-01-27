@@ -4,6 +4,7 @@ import datetime
 from jugaad_data.nse import NSELive
 from pprint import pprint
 n = NSELive()
+from scipy.stats import norm
 
 
 import requests
@@ -18,15 +19,15 @@ app = Dash(__name__, title='Option Pricing Tool')
 app.layout = html.Div(style={'backgroundColor': '#6399EB'},
                       children=[
 
-                          html.Div([
-                              html.Img(className="logo", src='/assets/image.png')
-                          ]),
+                        #   html.Div([
+                        #       html.Img(className="logo", src='/assets/image.png')
+                        #   ]),
 
                           html.Div(
                               className="header",
                               children=[
                                   html.Span('Welcome to Mathematical Option Pricing and Comparison Tool',
-                                            className="header--title")
+                                            className="header--title"),html.Img(className="logo", src='/assets/image.png')
                               ]
                           ),
                           html.Div(
@@ -108,7 +109,7 @@ def calculate_business_days_to_date(selected_date, holidays=[]):
     business_days = 0
 
     business_days = np.busday_count(today, selected_date, holidays=holidays)
-
+    # print(business_days)
     return abs(business_days)
 
 
@@ -116,9 +117,9 @@ def calculate_business_days_to_date(selected_date, holidays=[]):
 def option_pricing_calculations(underlying, expiry):
     symbol = underlying
     r = 0.0711                                           
-    n = 8     
-    T = datetime.datetime.strptime(expiry, "%d-%b-%Y").date()
-    T = calculate_business_days_to_date(T)
+    n = 4     
+    T1 = datetime.datetime.strptime(expiry, "%d-%b-%Y").date()
+    T = calculate_business_days_to_date(T1)
     underlyingValue = json_object["records"]["underlyingValue"]
     
     strikePrice = []
@@ -158,67 +159,38 @@ def option_pricing_calculations(underlying, expiry):
                 CallLastPrice.append(0)
                 CallIV.append(0)
 
+    calc_call = []
+    calc_put = []
 
-    # for i in range(len(json_object["records"]["data"])):
-    #     if (json_object["records"]["data"][i]["expiryDate"]==expiry):  # for bankNifty it has to change
-    #         strike_price.append(json_object["records"]["data"][i]["strikePrice"]) 
-    #         actual_put.append(json_object["records"]["data"][i]["PE"]["lastPrice"])  # There are some empty values, do some change
-    #         actual_call.append(json_object["records"]["data"][i]["CE"]["lastPrice"])
-    #         iv_call.append(json_object["records"]["data"][i]["CE"]["impliedVolatility"])
-    #         iv_put.append(json_object["records"]["data"][i]["PE"]["impliedVolatility"])
+    for i in range(len(strikePrice)):
+        calc_put.append(blackScholes(r, underlyingValue, strikePrice[i], T/365, PutIV[i]/100, type='P'))
+        calc_call.append(blackScholes(r, underlyingValue, strikePrice[i], T/365, CallIV[i]/100, type='C'))
 
-                
-    calc_call = binomial_option_prices(underlyingValue,strikePrice,r,T,CallIV,n,"call")  
-    calc_put = binomial_option_prices(underlyingValue,strikePrice,r,T,PutIV,n,"put") 
-
-    # calc_call = np.zeros(len(strikePrice)) 
-    # calc_put = np.zeros(len(strikePrice))   
-
-
+    # print(blackScholes(r, underlyingValue, 20100, T, CallIV[2], type='C'))
+ 
     arr = (np.column_stack((CallLastPrice, calc_call, strikePrice, PutLastPrice, calc_put)))
     return arr
 
-def binomial_option_prices(S, X_values, r, T, volatility_values, n, option_type):
-    prices = []
-    for X in X_values:
-        option_prices = []
-        for volatility in volatility_values:
-            delta_t = T / n
-            u = math.exp(volatility * math.sqrt(delta_t))
-            
-            d = 1 / u
-            print(volatility,math.sqrt(delta_t),u,d)
-            # ############## it shows divide by 0 error, so added these
-            # if not (u-d):
-            #     break
-            p = (math.exp(r * delta_t) - d) / (u - d)
-            discount_factor = math.exp(-r * delta_t)
 
-            stock_prices = []
-            for i in range(n + 1):
-                stock_price = S * (u ** (n - i)) * (d ** i)
-                stock_prices.append(stock_price)
+def blackScholes(r, S, K, T, sigma, type='C'):
+    if sigma == 0:
+        return ('ILLIQUIDITY')
+        
+    else:
 
-            option_values = []
-            for stock_price in stock_prices:
-                if option_type == "call":
-                    option_value = max(stock_price - X, 0)
-                else:
-                    option_value = max(X - stock_price, 0)
-                option_values.append(option_value)
+        d1 = (np.log(S/K) + (r + (sigma**2)/2)*T)/(sigma*np.sqrt(T))
+        d2 = d1 - sigma*np.sqrt(T)
+        try:
+            if (type == 'C'):
+                price = S*norm.cdf(d1, 0, 1) - K*np.exp(-r*T)*norm.cdf(d2, 0, 1)
+            elif (type == 'P'):
+                price = K*np.exp(-r*T)*norm.cdf(-d2, 0, 1) - S*norm.cdf(-d1, 0, 1)
+            return (round(price,2))
+        except:
+            print("Please enter C or P for Call & Put options respectively")
 
-            for i in range(n):
-                option_values_next = []
-                for j in range(len(option_values) - 1):
-                    option_value = (p * option_values[j] + (1 - p) * option_values[j + 1]) * discount_factor
-                    option_values_next.append(option_value)
-                option_values = option_values_next
 
-            option_prices.append(option_values[0])
 
-        prices.append(option_prices[0])
-    print(option_prices)
-    return prices
 
 if __name__ == "__main__":
     app.run_server(debug=True)
