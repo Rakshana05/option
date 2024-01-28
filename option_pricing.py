@@ -2,34 +2,22 @@ from dash import Dash, dcc, html, Input, Output, State
 import numpy as np
 import datetime
 from jugaad_data.nse import NSELive
-from pprint import pprint
-n = NSELive()
 from scipy.stats import norm
-
-
-import requests
-import json
-import math
-
-# symbol="NIFTY"
-
 
 app = Dash(__name__, title='Option Pricing Tool')
 
-app.layout = html.Div(style={'backgroundColor': '#6399EB'},
+app.layout = html.Div(className="container",
                       children=[
 
-                        #   html.Div([
-                        #       html.Img(className="logo", src='/assets/image.png')
-                        #   ]),
+                          html.Div([
+                              html.Img(className="logo", src='/assets/image.png',
+                                       style={'width': '20%', 'height': '20%', 'margin': 35}),
+                              html.H1('Option Pricing Tool',
+                                      style={'color': '#000b3b', 'text-align': 'center', 'font-size': '50px',
+                                             'font-weight': 'bold', 'font-family': 'sans-serif', 'margin-top': '0px',
+                                             'margin-bottom': '0px', 'padding-top': '0px', 'padding-bottom': '0px'})
+                          ]),
 
-                          html.Div(
-                              className="header",
-                              children=[
-                                  html.Span('Welcome to Mathematical Option Pricing and Comparison Tool',
-                                            className="header--title"),html.Img(className="logo", src='/assets/image.png')
-                              ]
-                          ),
                           html.Div(
                               className="inputs",
                               children=[
@@ -40,11 +28,12 @@ app.layout = html.Div(style={'backgroundColor': '#6399EB'},
                                           {"label": "BANKNIFTY", "value": "BANKNIFTY"}
                                       ],
                                       placeholder="Select Underlying",
-                                      className="inputs--drop"
+                                      className="dropdown"
                                   ),
-                                  html.Button("RunSymbol", id="run-symbol", className="inputs--run"),
-                                  dcc.Dropdown(id='select-time',placeholder="Select Time to Expiry",className="inputs--date"),
-                                  html.Button("RunTime", id="run-time", className="inputs--run"),
+                                  html.Button("Load Dates", id="run-symbol", className="button"),
+                                  dcc.Dropdown(id='select-time', placeholder="Select Time to Expiry",
+                                               className="dropdown"),
+                                  html.Button("Calculate", id="run-time", className="button"),
                               ]),
                           html.Div(id="output-div", className="outputs")
                       ])
@@ -55,8 +44,7 @@ app.layout = html.Div(style={'backgroundColor': '#6399EB'},
     [Input("run-symbol", "n_clicks")],
     [State("select-underlying", "value")],
     prevent_initial_call=True)
-
-def create_expiry_dates(n_clicks,symbol):
+def create_expiry_dates(n_clicks, symbol):
     # url = "https://www.nseindia.com/api/option-chain-indices?symbol={}".format(symbol)
     # headers={'User-Agent' : 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'}
     # response = requests.get(url, headers=headers, timeout=10)
@@ -64,7 +52,7 @@ def create_expiry_dates(n_clicks,symbol):
     global json_object
     # json_object = json.loads(response.text)
 
-    json_object = n.index_option_chain(symbol)
+    json_object = NSELive().index_option_chain(symbol)
 
     expiryDates = json_object["records"]["expiryDates"]
     return expiryDates
@@ -76,7 +64,6 @@ def create_expiry_dates(n_clicks,symbol):
     [State("select-underlying", "value"),
      State("select-time", "value")],
     prevent_initial_call=True)
-
 def calculate_option_price(n_clicks, underlying, expiry):
     if underlying and expiry:
         # Placeholder for external calculation logic
@@ -116,29 +103,29 @@ def calculate_business_days_to_date(selected_date, holidays=[]):
 # Placeholder function for now
 def option_pricing_calculations(underlying, expiry):
     symbol = underlying
-    r = 0.0711                                           
-    n = 4     
+    r = 0.0711
+    n = 4
     T1 = datetime.datetime.strptime(expiry, "%d-%b-%Y").date()
     T = calculate_business_days_to_date(T1)
     underlyingValue = json_object["records"]["underlyingValue"]
-    
+
     strikePrice = []
     PutLastPrice = []
     CallLastPrice = []
     PutIV = []
     CallIV = []
 
-    if underlying=="NIFTY":
-        L,H=20000,22000
-    else:
-        L,H=33000,55000
+    if underlying == "NIFTY":
+        L, H = 20000, 22000
+    elif underlying == "BANKNIFTY":
+        L, H = 33000, 55000
 
     for option_data in json_object['records']['data']:
 
         strike_price = option_data['strikePrice']
 
         # Only append details for strike prices above the threshold
-        if strike_price >= L and strike_price <= H and option_data['expiryDate']==expiry:
+        if strike_price >= L and strike_price <= H and option_data['expiryDate'] == expiry:
             strikePrice.append(strike_price)
 
             if 'PE' in option_data:
@@ -163,34 +150,32 @@ def option_pricing_calculations(underlying, expiry):
     calc_put = []
 
     for i in range(len(strikePrice)):
-        calc_put.append(blackScholes(r, underlyingValue, strikePrice[i], T/365, PutIV[i]/100, type='P'))
-        calc_call.append(blackScholes(r, underlyingValue, strikePrice[i], T/365, CallIV[i]/100, type='C'))
+        calc_put.append(blackScholes(r, underlyingValue, strikePrice[i], T / 365, PutIV[i] / 100, type='P'))
+        calc_call.append(blackScholes(r, underlyingValue, strikePrice[i], T / 365, CallIV[i] / 100, type='C'))
 
     # print(blackScholes(r, underlyingValue, 20100, T, CallIV[2], type='C'))
- 
+
     arr = (np.column_stack((CallLastPrice, calc_call, strikePrice, PutLastPrice, calc_put)))
     return arr
 
 
 def blackScholes(r, S, K, T, sigma, type='C'):
     if sigma == 0:
-        return ('ILLIQUIDITY')
-        
+        return ('ILLIQUID')
+
     else:
 
-        d1 = (np.log(S/K) + (r + (sigma**2)/2)*T)/(sigma*np.sqrt(T))
-        d2 = d1 - sigma*np.sqrt(T)
+        d1 = (np.log(S / K) + (r + (sigma ** 2) / 2) * T) / (sigma * np.sqrt(T))
+        d2 = d1 - sigma * np.sqrt(T)
         try:
             if (type == 'C'):
-                price = S*norm.cdf(d1, 0, 1) - K*np.exp(-r*T)*norm.cdf(d2, 0, 1)
+                price = S * norm.cdf(d1, 0, 1) - K * np.exp(-r * T) * norm.cdf(d2, 0, 1)
             elif (type == 'P'):
-                price = K*np.exp(-r*T)*norm.cdf(-d2, 0, 1) - S*norm.cdf(-d1, 0, 1)
-            return (round(price,2))
+                price = K * np.exp(-r * T) * norm.cdf(-d2, 0, 1) - S * norm.cdf(-d1, 0, 1)
+            return (round(price, 2))
         except:
             print("Please enter C or P for Call & Put options respectively")
 
 
-
-
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=False)
