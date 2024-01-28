@@ -5,6 +5,7 @@ from jugaad_data.nse import NSELive
 from scipy.stats import norm
 
 app = Dash(__name__, title='Option Pricing Tool')
+server = app.server
 
 app.layout = html.Div(className="container",
                       children=[
