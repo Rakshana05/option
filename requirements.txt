@@ -4,3 +4,4 @@ datetime
 jugaad_data
 scipy
 gunicorn
+werkzeug==2.2.2
