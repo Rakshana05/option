@@ -3,3 +3,4 @@ numpy
 datetime
 jugaad_data
 scipy
+gunicorn
