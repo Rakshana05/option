@@ -18,6 +18,15 @@
     background-color: #bdc9ff;
 }
 
+.description {
+    margin-top: 50px;
+    /* margin-left: 30%;
+     */
+    text-align: center;
+    font-size: 18px;
+    font-family: sans-serif;
+}
+
 .button{
     background-color: #000b3b;
     color: white;
@@ -55,6 +64,11 @@ margin: 10px auto;
 font-family: monospace;
 }
 
+th tr .tablehead {
+    background-color: #000b3b;
+    color: white;
+}
+
 th, td {
 border: 1px solid #ddd;
 padding: 10px;
@@ -73,4 +87,11 @@ h4{
 text-align: center;
 font-size: 32px;
 font-family: sans-serif;
+}
+
+.last-updated {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 10px;
+    font-family: sans-serif;
 }
